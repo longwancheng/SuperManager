@@ -5,71 +5,126 @@
 #include "DebugHeader.h"
 #include "EditorUtilityLibrary.h"
 #include "EditorAssetLibrary.h"
-
-void UQuickAssetAction::DuplicateAssets(int32 NumOfDupicates)
+#include "ObjectTools.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "AssetToolsModule.h"
+void UQuickAssetAction::DuplicateAsset(int32 NumOfDuplicates)
 {
-	if(NumOfDupicates<=0)
+	if(NumOfDuplicates <= 0)
 	{
-		ShowMsgDialog(EAppMsgType::Ok,"Please enter a valid number");
+		DebugHeader::ShowMsgDialog(EAppMsgType::Ok,TEXT("Please enter a Valid number"),true);
 		return;
 	}
-	TArray<FAssetData> SelectedAssetsData = UEditorUtilityLibrary::GetSelectedAssetData();
+
+	TArray<FAssetData> SelectedAssetsData =  UEditorUtilityLibrary::GetSelectedAssetData();
 	uint32 Counter = 0;
 
-	for(const FAssetData& SelectedAssetData : SelectedAssetsData)
+	for(const FAssetData& SelectedAssetData :SelectedAssetsData)
 	{
-		for(int32 i = 0;i<NumOfDupicates;i++)
+		for(int32 i = 0;i<NumOfDuplicates;i++)
 		{
 			const FString SourceAssetPath = SelectedAssetData.ObjectPath.ToString();
-			const FString NewDuplicateedAssetName = SelectedAssetData.AssetName.ToString() + TEXT("_")+FString::FromInt(i+1);
-			const FString NewPathName = FPaths::Combine(SelectedAssetData.PackagePath.ToString(),NewDuplicateedAssetName);
-			if(UEditorAssetLibrary::DuplicateAsset(SourceAssetPath,NewPathName))
+			const FString NumDuplicatedAssetName = SelectedAssetData.AssetName.ToString() + TEXT("_")+FString::FromInt(i+1);
+			const FString NewPathName = FPaths::Combine(SelectedAssetData.PackagePath.ToString(),NumDuplicatedAssetName);
+
+			if (UEditorAssetLibrary::DuplicateAsset(SourceAssetPath,NewPathName))
 			{
-					UEditorAssetLibrary::SaveAsset(NewPathName,false);
-					++Counter;
+				UEditorAssetLibrary::SaveAsset(NewPathName,false);
+				++Counter;
 			}
 		}
 	}
 	if(Counter>0)
 	{
-		ShowNotifyInfo(TEXT("Successfully duplicated " + FString::FromInt(Counter)+" files"));
-		//Print(TEXT("Successfully duplicated " + FString::FromInt(Counter)+" files"),FColor::Green);
+		DebugHeader::ShowNotifyInfo(TEXT("Successfully duplicated "+FString::FromInt(Counter))+" files");
 	}
 }
+
+void UQuickAssetAction::RemoveUnusedAsset()
+{
+	TArray<FAssetData> SelectedAssetsData = UEditorUtilityLibrary::GetSelectedAssetData();
+	TArray<FAssetData> UnusedAssetsData;
+
+	FixUpRedirectors();
+
+	for (const FAssetData& SelectedAssetData:SelectedAssetsData)
+	{
+		TArray<FString> AssetRefrencers = 
+		UEditorAssetLibrary::FindPackageReferencersForAsset(SelectedAssetData.ObjectPath.ToString());
+		if(AssetRefrencers.Num()==0)
+		{
+			UnusedAssetsData.Add(SelectedAssetData);
+		}
+	}
+	if(UnusedAssetsData.Num() == 0)
+	{
+		DebugHeader::ShowMsgDialog(EAppMsgType::Ok,TEXT("No unused found among selected assets"),false);
+		return;
+	}
+
+	int32 NumOfAssetDeleted = ObjectTools::DeleteAssets(UnusedAssetsData);
+	if (NumOfAssetDeleted == 0) return;
+
+	DebugHeader::ShowNotifyInfo(TEXT("Successfully deleted "+FString::FromInt(NumOfAssetDeleted))+"Assets");
+}
+
+void UQuickAssetAction::FixUpRedirectors()
+{
+	TArray<UObjectRedirector* > RedirectorToFixArray;
+	FAssetRegistryModule& AssetRegistryModule = 
+	FModuleManager::Get().LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
+
+	FARFilter Filter;
+	Filter.bRecursivePaths = true;//是否包括其子文件夹
+	Filter.PackagePaths.Emplace("/Game");
+	Filter.ClassNames.Emplace("ObjectRedirector");
+	TArray<FAssetData> OutRedirectors;
+	AssetRegistryModule.Get().GetAssets(Filter, OutRedirectors);
+	for (const FAssetData& RedirectorData : OutRedirectors) {
+		if (UObjectRedirector* RedirectorToFix = Cast<UObjectRedirector>(RedirectorData.GetAsset())) {
+			RedirectorToFixArray.Add(RedirectorToFix);
+		}
+	}
+	FAssetToolsModule& AssetToolsModule = 
+	FModuleManager::LoadModuleChecked<FAssetToolsModule>(TEXT("AssetTools"));
+
+	AssetToolsModule.Get().FixupReferencers(RedirectorToFixArray);
+}
+
 void UQuickAssetAction::AddPrefixs()
 {
 	TArray<UObject*> SelectedObjects = UEditorUtilityLibrary::GetSelectedAssets();
 	uint32 Counter = 0;
 
-	for(UObject* SelectedObject : SelectedObjects)
+	for (UObject* SelectedObejct:SelectedObjects)
 	{
-		if(!SelectedObject) continue;
-		FString* PrefixFound = PrefixMap.Find(SelectedObject->GetClass());
-
-		if(!PrefixFound||PrefixFound->IsEmpty())
+		if(!SelectedObejct) continue;
+		FString* Prefixfound = PrefixMap.Find(SelectedObejct->GetClass());
+		if(!Prefixfound||Prefixfound->IsEmpty())
 		{
-			Print(TEXT("Failed to find prefix for class")+SelectedObject->GetClass()->GetName(),FColor::Red);
+			DebugHeader::Print(TEXT("Failed to find prefix for class "+SelectedObejct->GetClass()->GetName()),FColor::Red);
 			continue;
 		}
-		FString OldName = SelectedObject->GetName();
-
-		if(OldName.StartsWith(*PrefixFound))
+		FString OldName = SelectedObejct->GetName();
+		if(OldName.StartsWith(*Prefixfound))
 		{
-			Print(OldName+TEXT(" already has prefix added"),FColor::Red);
+			DebugHeader::Print(OldName +TEXT(" already has prefix added"),FColor::Red);
 			continue;
 		}
-		FString NewNameWithPrefix = *PrefixFound + OldName;
-		if(NewNameWithPrefix.Contains("M_") || NewNameWithPrefix.Contains("_inst"))
+
+		if(SelectedObejct ->IsA<UMaterialInstanceConstant>())
 		{
-			NewNameWithPrefix = NewNameWithPrefix.Replace(TEXT("M_"),TEXT(""));
-			NewNameWithPrefix = NewNameWithPrefix.Replace(TEXT("_inst"),TEXT(""));
-		};
-		UEditorUtilityLibrary::RenameAsset(SelectedObject,NewNameWithPrefix );
+			OldName.RemoveFromStart(TEXT("M_"));
+			OldName.RemoveFromEnd(TEXT("_inst"));
+		}
+		const FString NewNameWithPrefix = *Prefixfound + OldName;
+
+		UEditorUtilityLibrary::RenameAsset(SelectedObejct,NewNameWithPrefix);
+
 		++Counter;
 	}
 	if(Counter>0)
 	{
-		ShowNotifyInfo(TEXT("Successfully renamed "+ FString::FromInt(Counter)+" assets"));
+		DebugHeader::ShowNotifyInfo(TEXT("Successfully renamed + "+FString::FromInt(Counter)+" assets"));
 	}
 }
-
