@@ -5,6 +5,8 @@
 void SAdvanceDeletionTab::Construct(const FArguments& InArgs)
 {
 	bCanSupportFocus = true;
+	
+	StoreAssetsDataUnderSelectedFolderArray = InArgs._AssetsDataToStore;
 
 	FSlateFontInfo TitleTextFont = FCoreStyle::Get().GetFontStyle(FName("EmbossedText"));
 
@@ -26,6 +28,13 @@ void SAdvanceDeletionTab::Construct(const FArguments& InArgs)
 			.AutoHeight()
 			[
 				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				[
+					SNew(SListView<TSharedPtr<FAssetData>>)
+					.ItemHeight(24.f)
+					.ListItemsSource(&StoreAssetsDataUnderSelectedFolderArray)
+					.OnGenerateRow(this,&SAdvanceDeletionTab::OnGenerateRowForList)
+				]
 			]
 			+SVerticalBox::Slot()
 			.AutoHeight()
@@ -35,7 +44,21 @@ void SAdvanceDeletionTab::Construct(const FArguments& InArgs)
 			+ SVerticalBox::Slot()
 			.AutoHeight()
 			[
-				SNew(SScrollBox)
+				SNew(SHorizontalBox)
 			]
 		];
+}
+
+TSharedRef<ITableRow> SAdvanceDeletionTab::OnGenerateRowForList(TSharedPtr<FAssetData> AssetDataToDisplay, const TSharedRef<STableViewBase>& OwnerTable)
+{
+
+	const FString DisplayAssetName = AssetDataToDisplay->AssetName.ToString();
+
+	TSharedRef<STableRow<TSharedPtr<FAssetData>>> ListViewRowWidget = SNew(STableRow<TSharedPtr<FAssetData>>, OwnerTable)
+		[
+			SNew(STextBlock)
+			.Text(FText::FromString(DisplayAssetName))
+		];
+
+	return ListViewRowWidget;
 }

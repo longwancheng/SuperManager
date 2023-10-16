@@ -216,7 +216,7 @@ TSharedRef<SDockTab> FSuperManagerModule::OnSpawnAdvanceDeletionTab(const FSpawn
 	return SNew(SDockTab).TabRole(ETabRole::NomadTab)
 		[
 			SNew(SAdvanceDeletionTab)
-			.TestString(TEXT("I am passing data"))
+			.AssetsDataToStore(GetAllAssetDataUnderSelectedFolder())
 		];
 }
 
@@ -240,7 +240,9 @@ TArray<TSharedPtr<FAssetData>> FSuperManagerModule::GetAllAssetDataUnderSelected
 
 		const FAssetData Data = UEditorAssetLibrary::FindAssetData(AssetPathName);
 
-		
+		AvaiableAssetData.Add(MakeShared<FAssetData>(Data));
+	}
+	return AvaiableAssetData;
 }
 
 #pragma endregion

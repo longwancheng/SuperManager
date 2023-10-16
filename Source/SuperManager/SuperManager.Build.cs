@@ -45,7 +45,8 @@ public class SuperManager : ModuleRules
 				"SlateCore",
 				"UnrealEd",
 				"AssetTools",
-				"ContentBrowser"
+				"ContentBrowser",
+				"InputCore"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);
