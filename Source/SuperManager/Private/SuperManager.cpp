@@ -9,7 +9,7 @@
 #include "AssetToolsModule.h"
 #include "ObjectTools.h"
 #include "Widgets/Docking/SDockTab.h"
-#include "AdvanceDeletionWidget.h"
+#include "Widget/AdvanceDeletionWidget.h"
 #define LOCTEXT_NAMESPACE "FSuperManagerModule"
 
 void FSuperManagerModule::StartupModule()
@@ -224,6 +224,11 @@ TArray<TSharedPtr<FAssetData>> FSuperManagerModule::GetAllAssetDataUnderSelected
 {
 	TArray<TSharedPtr<FAssetData>> AvaiableAssetData;
 
+
+	if (FolderPathsSelected.IsEmpty()) {
+		return AvaiableAssetData;
+	}
+
 	TArray<FString> AssetsPathNames = UEditorAssetLibrary::ListAssets(FolderPathsSelected[0]);
 
 	for (const FString& AssetPathName : AssetsPathNames) {
@@ -245,6 +250,22 @@ TArray<TSharedPtr<FAssetData>> FSuperManagerModule::GetAllAssetDataUnderSelected
 	return AvaiableAssetData;
 }
 
+
+
+#pragma endregion
+
+#pragma region ProccessDataForAdvanceDeletionTab
+bool FSuperManagerModule::DeleteSingleAssetForAssetList(const FAssetData& AssetDataToDelete)
+{
+	TArray<FAssetData> AssetDataForDeletion;
+	AssetDataForDeletion.Add(AssetDataToDelete);
+	return ObjectTools::DeleteAssets(AssetDataForDeletion) == 0 ? false:true;
+}
+
+bool FSuperManagerModule::DeleteAllAssetForAssetList(const TArray<FAssetData>& AssetDataForDeletion)
+{
+	return ObjectTools::DeleteAssets(AssetDataForDeletion) == 0 ? false : true;
+}
 #pragma endregion
 #undef LOCTEXT_NAMESPACE
 	
